@@ -1,0 +1,26 @@
+{
+  "date": "2026-09-03",
+  "rack": {
+    "vancouver": 161.8,
+    "nanaimo": 163.9
+  },
+  "hit_rate": "building\u2026",
+  "predictions": [
+    {
+      "city": "vancouver",
+      "direction": "FLAT",
+      "change_c": 0.0,
+      "predicted_c": 223.8,
+      "verdict": "No meaningful move expected tomorrow \u2014 fill up whenever.",
+      "basis": "warming-up"
+    },
+    {
+      "city": "victoria",
+      "direction": "FLAT",
+      "change_c": 0.0,
+      "predicted_c": 218.9,
+      "verdict": "No meaningful move expected tomorrow \u2014 fill up whenever.",
+      "basis": "warming-up"
+    }
+  ]
+}
