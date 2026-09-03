@@ -1,84 +1,82 @@
 """
-Data fetching.
+Data fetching for the BC gas predictor.
 
-  1. Petro-Canada posted terminal rack  (FREE, DAILY)  <- the only input needed
-  2. Current retail pump average        (OPTIONAL — off by default)
+Petro-Canada blocks plain HTTP requests (it returns a 500 / bot page to anything
+that isn't a real browser), so we load the page in a headless browser
+(Playwright) exactly as a person would, then read the Vancouver and Nanaimo
+terminal rack from the rendered table. Retail is optional and off by default.
 
-You (Evan) don't need to edit anything here. The rack fetch runs on its own and,
-if Petro-Canada ever changes their page, the app keeps showing the last known
-number instead of breaking (see run.py). Retail is switched off so nothing extra
-is required to launch; it can be turned on later to publish an accuracy log.
-
-The notes below are for whoever maintains the code (that's me — if the fetch
-ever fails, send me the error and I'll patch this file).
+Maintainer note: if this stops finding values, either the page layout / column
+labels changed, or Petro-Canada started blocking the runner's IP. run.py wraps
+this call so a failure reuses yesterday's numbers and keeps the site up.
 """
-
 from __future__ import annotations
-import io
-import requests
-import pandas as pd
+import re
+from playwright.sync_api import sync_playwright
 
-UA = {"User-Agent": "Mozilla/5.0 (compatible; rack-predictor/1.0; personal project)"}
 RACK_URL = "https://www.petro-canada.ca/en/business/rack-prices"
-
-# Terminals you care about. Vancouver -> Metro Van retail; Nanaimo -> Victoria/Island.
 TERMINALS = {"vancouver": "Vancouver", "nanaimo": "Nanaimo"}
+PRODUCT = "REG E-10"        # the 10%-ethanol regular column (what pumps sell)
+UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+      "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36")
 
-# Which product column to read. Regular 87, E-10 blend, in CAD cents/L excl. tax.
-PRODUCT_HINT = "Regular"        # tune to the exact column label on the page
+
+def _norm(s: str) -> str:
+    """Lowercase and strip everything but letters/digits, so 'REG E-10' -> 'rege10'."""
+    return re.sub(r"[^a-z0-9]", "", (s or "").lower())
 
 
-def fetch_rack() -> dict[str, float]:
-    """
-    Return {'vancouver': <c/L>, 'nanaimo': <c/L>} from Petro-Canada's posted rack.
+def fetch_rack() -> dict:
+    """Return {'vancouver': <c/L>, 'nanaimo': <c/L>} from Petro-Canada's daily rack."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(args=["--no-sandbox", "--disable-dev-shm-usage"])
+        ctx = browser.new_context(user_agent=UA, locale="en-CA")
+        page = ctx.new_page()
+        try:
+            page.goto(RACK_URL, wait_until="domcontentloaded", timeout=60000)
+            # Wait until the React table is actually populated (many rows), which
+            # also gives Cloudflare time to clear.
+            page.wait_for_function(
+                "document.querySelectorAll('table tr').length > 10", timeout=45000)
+            rows = page.eval_on_selector_all(
+                "table tr",
+                "els => els.filter(tr => tr.offsetParent !== null)"
+                ".map(tr => Array.from(tr.querySelectorAll('th,td'))"
+                ".map(c => c.innerText.trim()))",
+            )
+        finally:
+            browser.close()
 
-    MAINTAINER NOTE ----------------------------------------------------------
-    pandas.read_html works if the table is in the served markup. If it comes back
-    empty, the table is JS-loaded from a JSON endpoint: DevTools -> Network ->
-    XHR, find the request returning the rack numbers, and call THAT url here (it's
-    plain JSON, and more robust than HTML scraping). run.py wraps this call so a
-    failure reuses yesterday's values and keeps the site up rather than crashing.
-    -------------------------------------------------------------------------
-    """
-    html = requests.get(RACK_URL, headers=UA, timeout=30).text
-    tables = pd.read_html(io.StringIO(html))   # list of DataFrames found on the page
+    # Find the REG E-10 column index from the header row.
+    target = _norm(PRODUCT)
+    col = None
+    for r in rows:
+        for i, cell in enumerate(r):
+            if _norm(cell) == target:
+                col = i
+                break
+        if col is not None:
+            break
+    if col is None:
+        raise RuntimeError(f"Rack table found but no '{PRODUCT}' column — layout changed?")
 
-    out: dict[str, float] = {}
-    for df in tables:
-        cols = [str(c) for c in df.columns]
-        loc_col = next((c for c in cols if "location" in c.lower() or "terminal" in c.lower()), cols[0])
-        prod_col = next((c for c in cols if PRODUCT_HINT.lower() in c.lower()), None)
-        if prod_col is None:
+    out: dict = {}
+    for r in rows:
+        if not r:
             continue
-        for _, row in df.iterrows():
-            name = str(row[loc_col]).strip().lower()
-            for key, label in TERMINALS.items():
-                if label.lower() in name and key not in out:
-                    out[key] = _to_cents(row[prod_col])
+        name = _norm(r[0])
+        for key, label in TERMINALS.items():
+            if _norm(label) in name and key not in out and len(r) > col:
+                val = re.sub(r"[^0-9.]", "", r[col])
+                if val:
+                    out[key] = round(float(val), 1)
 
     missing = [k for k in TERMINALS if k not in out]
     if missing:
-        raise RuntimeError(
-            f"Rack fetch found no value for {missing}. Page format likely changed "
-            f"— see WIRE-UP #1 in fetch.py. Tables seen: {len(tables)}"
-        )
+        raise RuntimeError(f"Rack fetch found no value for {missing} — page format changed?")
     return out
 
 
-def fetch_retail() -> dict[str, float | None]:
-    """
-    Return {'vancouver': <c/L or None>, 'victoria': <c/L or None>} — today's
-    average pump price incl. taxes, used only to grade/tune the model.
-
-    OFF BY DEFAULT so launch needs nothing extra. Returning None makes the model
-    run on rack alone. To switch it on later (for a public accuracy log), plug a
-    compliant retail source in here — that's a maintainer job, not yours.
-    -------------------------------------------------------------------------
-    """
+def fetch_retail() -> dict:
+    """Optional retail (off by default). None makes the model run on rack alone."""
     return {"vancouver": None, "victoria": None}
-
-
-def _to_cents(v) -> float:
-    """Coerce '148.9', '148.9¢', 148.9 -> 148.9 (float, cents/L)."""
-    s = str(v).replace("¢", "").replace(",", "").strip()
-    return round(float(s), 1)
