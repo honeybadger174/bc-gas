@@ -26,7 +26,7 @@ NOISE_C   = 0.75   # dead-band in c/L: |predicted move| under this = "FLAT"
 # Eyeball it once from today's numbers; the model refines it automatically once
 # real retail data flows. Metro Van carries the TransLink levy; the Island does
 # not, so the two markups differ — that difference is itself a feature.
-SEED_MARKUP = {"vancouver": 62.0, "victoria": 55.0}   # c/L, PLACEHOLDER — set these
+SEED_MARKUP = {"vancouver": 46.0, "victoria": 51.0}   # c/L, calibrated to GasBuddy avgs (Sep 2026)
 
 
 @dataclass
@@ -65,7 +65,7 @@ def predict(city: str, rack_today: float, rack_prev: float | None,
     return Prediction(city, direction, change, predicted, verdict, basis)
 
 
-def rolling_markup(history_rows: list[dict], city: str, days: int = 14) -> float | None:
+def rolling_markup(history_rows: list, city: str, days: int = 14):
     """Median of (retail - same-day rack) over recent days, when both exist."""
     rack_key = "rack_vancouver" if city == "vancouver" else "rack_nanaimo"
     diffs = [r[f"retail_{city}"] - r[rack_key]
@@ -78,7 +78,7 @@ def rolling_markup(history_rows: list[dict], city: str, days: int = 14) -> float
     return round((diffs[n // 2] if n % 2 else (diffs[n // 2 - 1] + diffs[n // 2]) / 2), 1)
 
 
-def grade(prev_pred_dir: str, prev_retail: float | None, today_retail: float | None) -> bool | None:
+def grade(prev_pred_dir, prev_retail, today_retail):
     """Was yesterday's direction right? None if we can't tell (missing retail)."""
     if prev_pred_dir is None or prev_retail is None or today_retail is None:
         return None
