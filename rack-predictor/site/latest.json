@@ -1,25 +1,25 @@
 {
-  "date": "2026-09-14",
+  "date": "2026-09-15",
   "rack": {
-    "vancouver": 159.9,
-    "nanaimo": 162.0
+    "vancouver": 155.7,
+    "nanaimo": 157.8
   },
   "hit_rate": "building\u2026",
   "predictions": [
     {
       "city": "vancouver",
-      "direction": "FLAT",
-      "change_c": 0.0,
-      "predicted_c": 205.9,
-      "verdict": "No meaningful move expected tomorrow \u2014 fill up whenever.",
+      "direction": "DOWN",
+      "change_c": -2.3,
+      "predicted_c": 199.4,
+      "verdict": "Prices likely DOWN ~2.3\u00a2 tomorrow \u2014 wait if you can.",
       "basis": "rack-only"
     },
     {
       "city": "victoria",
-      "direction": "FLAT",
-      "change_c": 0.0,
-      "predicted_c": 213.0,
-      "verdict": "No meaningful move expected tomorrow \u2014 fill up whenever.",
+      "direction": "DOWN",
+      "change_c": -2.3,
+      "predicted_c": 206.5,
+      "verdict": "Prices likely DOWN ~2.3\u00a2 tomorrow \u2014 wait if you can.",
       "basis": "rack-only"
     }
   ]
