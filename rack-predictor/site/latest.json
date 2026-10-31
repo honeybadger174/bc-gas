@@ -1,5 +1,5 @@
 {
-  "date": "2026-10-30",
+  "date": "2026-10-31",
   "rack": {
     "vancouver": 152.8,
     "nanaimo": 154.9
@@ -8,18 +8,18 @@
   "predictions": [
     {
       "city": "vancouver",
-      "direction": "DOWN",
-      "change_c": -3.0,
-      "predicted_c": 195.8,
-      "verdict": "Prices likely DOWN ~3.0\u00a2 tomorrow \u2014 wait if you can.",
+      "direction": "FLAT",
+      "change_c": 0.0,
+      "predicted_c": 198.8,
+      "verdict": "No meaningful move expected tomorrow \u2014 fill up whenever.",
       "basis": "rack-only"
     },
     {
       "city": "victoria",
-      "direction": "DOWN",
-      "change_c": -3.0,
-      "predicted_c": 202.9,
-      "verdict": "Prices likely DOWN ~3.0\u00a2 tomorrow \u2014 wait if you can.",
+      "direction": "FLAT",
+      "change_c": 0.0,
+      "predicted_c": 205.9,
+      "verdict": "No meaningful move expected tomorrow \u2014 fill up whenever.",
       "basis": "rack-only"
     }
   ]
